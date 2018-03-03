@@ -14,6 +14,7 @@ gearbeitet.**
 Basierend auf dem Beispiel [thermal\_cam\_interpolate](https://github.com/adafruit/Adafruit_AMG88xx/tree/master/examples/thermal_cam_interpolate "thermal_cam_interpolate") von [adafruit](https://www.adafruit.com/) wurde die Software für die ThermoCam entwickelt. Die Interpolationsfunktion "interpolation.cpp", welche die real 8x8 Bildpixel des Thermosensors auf 32x32 Pixel interpoliert wurde 1:1 von adafruit übernommen.
 
 #Software
+
 Da der ESP8266 Arduino-kompatibel ist, kann die Software mit allen verfügbaren Arduino-Entwicklungsumgebungen gebaut und geflasht werden.
 Dabei kommen folgende Standard-Arduino-Bibliotheken zum Einsatz:
 
