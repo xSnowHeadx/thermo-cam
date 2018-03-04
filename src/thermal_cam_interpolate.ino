@@ -1,21 +1,8 @@
 /***************************************************************************
- This is a library for the AMG88xx GridEYE 8x8 IR camera
+ Firmware for a ThermoCam
 
- This sketch makes an inetrpolated pixel thermal camera with the
- GridEYE sensor and a 2.4" tft featherwing:
- https://www.adafruit.com/product/3315
-
- Designed specifically to work with the Adafruit AMG8833 Featherwing
- https://www.adafruit.com/product/3622
-
- These sensors use I2C to communicate. The device's I2C address is 0x69
-
- Adafruit invests time and resources providing this open source code,
- please support Adafruit andopen-source hardware by purchasing products
- from Adafruit!
-
- Written by Dean Miller, James DeVito & ladyada for Adafruit Industries.
- BSD license, all text above must be included in any redistribution
+ Based on an example from Dean Miller, James DeVito & ladyada for Adafruit
+ Industries.
  ***************************************************************************/
 
 // ------------------begin ESP8266'centric----------------------------------
@@ -28,8 +15,8 @@ extern "C" {
 }
 // ------------------end ESP8266'centric------------------------------------
 
-#include <Adafruit_GFX.h>    // Core graphics library
-#include <TFT_eSPI.h> // Hardware-specific library
+#include <Adafruit_GFX.h>
+#include <TFT_eSPI.h>
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_AMG88xx.h>
@@ -44,22 +31,26 @@ enum {
   EEP_NEXT = EEP_CALV + sizeof(double),
 };
 
-#define B_MODE  0
-#define B_MAXP 10
-#define B_MAXM 12
-#define B_MINP  3
-#define B_MINM  1
-#define O_PWR  16
+// define the button-pins
+#define B_MODE  		0
+#define B_MAXP 			10
+#define B_MAXM 			12
+#define B_MINP  		3
+#define B_MINM  		1
+#define O_PWR  			16
 
+// define position and size of the battery symbol
 #define BATT_X 21
 #define BATT_Y  9
 #define BATT_START_X	100
-#define BATT_START_Y	  5
+#define BATT_START_Y	5
 
+// define voltage limit levels
 #define VBATT_CRIT		3.5
 #define VBATT_EMPT		3.35
 #define VBATT_OFF		3.3
 
+// a helper macro
 #define min(a,b) ((a)<(b)?(a):(b))
 
 //low range of the sensor (this will be blue on the screen)
@@ -68,6 +59,7 @@ int MINTEMP = 15;
 //high range of the sensor (this will be red on the screen)
 int MAXTEMP = 35;
 
+// the yellow battery symbol
 const unsigned short bat_critical[] = {
 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41,   // 0x0010 (16) pixels
 0xFE41, 0xFE41, 0xFE41, 0xFFFF, 0xFFFF, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41,   // 0x0020 (32) pixels
@@ -83,6 +75,7 @@ const unsigned short bat_critical[] = {
 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFE41, 0xFFFF, 0xFFFF, 0xFFFF,
 };
 
+// the red battery symbol
 const unsigned short bat_empty[] = {
 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4,   // 0x0010 (16) pixels
 0xE8E4, 0xE8E4, 0xE8E4, 0xFFFF, 0xFFFF, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4,   // 0x0020 (32) pixels
@@ -98,7 +91,7 @@ const unsigned short bat_empty[] = {
 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xE8E4, 0xFFFF, 0xFFFF, 0xFFFF,
 };
 
-//the colors we will be using
+//the colormap for temperatures
 const uint16_t camColors[] = {0x480F,
 0x400F,0x400F,0x400F,0x4010,0x3810,0x3810,0x3810,0x3810,0x3010,0x3010,
 0x3010,0x2810,0x2810,0x2810,0x2810,0x2010,0x2010,0x2010,0x1810,0x1810,
@@ -128,41 +121,47 @@ const uint16_t camColors[] = {0x480F,
 0xF080,0xF060,0xF040,0xF020,0xF800};
 
 
-#define AUTO_OFF_TIMEOUT	300000L
-#define AMG_COLS 			8
-#define AMG_ROWS 			8
-#define INTERPOLATED_COLS 	32
-#define INTERPOLATED_ROWS 	32
-#define RAWMODE				0x02
-#define MANUAL				0x01
+#define AUTO_OFF_TIMEOUT	300000L		// shut down after 5 minutes without action
+#define AMG_COLS 			8			// 8 columns of thermo pixel
+#define AMG_ROWS 			8			// 8 rows of thermo pixel
+#define INTERPOLATED_COLS 	32			// 32 temperature points per column on TFT
+#define INTERPOLATED_ROWS 	32			// 32 temperature points per row on TFT
+#define RAWMODE				0x02		// bitmask for not interpolated display
+#define MANUAL				0x01		// bitmask for manual temperature ranges
 
-bool blink_flag = 			false;
-bool volt_flag = 			false;
-bool cal_flag = 			false;
-double cal_val, cal_step;
-double  VBATT_CORR = 		0.0051939453125;
-double min_drag = 			999.0;
-double max_drag = 		   -999.0;
-uint32_t blink_millis = 	0;
-uint32_t auto_off_millis;
+bool blink_flag = 			false;		// common flag for blink functions
+bool volt_flag = 			false;		// voltage display mode active
+bool cal_flag = 			false;		// calibration mode active
+double cal_val, cal_step;				// help values for calibration mode
 int cal_pos;
+double  VBATT_CORR = 		0.0051939453125;	// scaling factor for voltage measurement
+double min_drag = 			999.0;		// lower value of trailing pointers
+double max_drag = 		   -999.0;		// higher value of trailing pointers
+uint32_t blink_millis = 	0;			// timer for blink functions
+uint32_t auto_off_millis;				// timer for automatic shutdown
 float pixels[AMG_COLS * AMG_ROWS];
 float dest_2d[INTERPOLATED_ROWS * INTERPOLATED_COLS];
 volatile int modeflag = 	0;
 volatile int draginit = 	1;
 
-TFT_eSPI tft = TFT_eSPI();       // Invoke custom library
-Adafruit_AMG88xx amg;
-OneButton b_mode(B_MODE, true);
+TFT_eSPI tft = TFT_eSPI();       		// Invoke custom library
+Adafruit_AMG88xx amg;					// create sensor object
+OneButton b_mode(B_MODE, true);			// create button objects
 OneButton b_maxp(B_MAXP, true);
 OneButton b_maxm(B_MAXM , true);
 OneButton b_minp(B_MINP, true);
 OneButton b_minm(B_MINM, true);
 
-void drawpixels(float *p, uint8_t rows, uint8_t cols, uint8_t boxWidth, uint8_t boxHeight);
+// calculate the coordinates of given point index
 float get_point(float *p, uint8_t rows, uint8_t cols, int8_t x, int8_t y);
+
+// interpolate the 8x8 sensor array to 32x32 for TFT
 void interpolate_image(float *src, uint8_t src_rows, uint8_t src_cols, float *dest, uint8_t dest_rows, uint8_t dest_cols);
 
+// draw the pixels regarding the measured temperatures
+void drawpixels(float *p, uint8_t rows, uint8_t cols, uint8_t boxWidth, uint8_t boxHeight);
+
+// read a double value from given address in EEPROM
 double eep_read_double(int address)
 {
 	unsigned int i;
@@ -177,6 +176,7 @@ double eep_read_double(int address)
 	return dval;
 }
 
+// write a double value to given address in EEPROM
 void eep_write_double(int address, double value)
 {
 	unsigned int i;
@@ -191,11 +191,13 @@ void eep_write_double(int address, double value)
 	EEPROM.commit();
 }
 
+// measure the battery voltage
 double read_batt(void)
 {
 	return ((double)UrsAdc.read() * VBATT_CORR);
 }
 
+// doubleclick function of MIN-
 void toggle_cal_flag(void)
 {
 	if(cal_flag ^= 1)
@@ -213,6 +215,7 @@ void toggle_cal_flag(void)
 	}
 }
 
+// doubleclick function of MIN+
 void toggle_volt_flag(void)
 {
 	if(!cal_flag)
@@ -228,12 +231,14 @@ void toggle_volt_flag(void)
 	}
 }
 
+// click function of SET
 void init_dragging(void)
 {
 	draginit = 1;
 	auto_off_millis = millis();
 }
 
+// longpress function of SET
 void next_mode(void)
 {
 	if(cal_flag)
@@ -255,6 +260,7 @@ void next_mode(void)
 	auto_off_millis = millis();
 }
 
+// click function of MAX+
 void do_maxp(void)
 {
 	if(cal_flag)
@@ -271,6 +277,7 @@ void do_maxp(void)
 	auto_off_millis = millis();
 }
 
+// click function of MAX-
 void do_maxm(void)
 {
 	if(cal_flag)
@@ -288,6 +295,7 @@ void do_maxm(void)
 	auto_off_millis = millis();
 }
 
+// click function of MIN+
 void do_minp(void)
 {
 	if(cal_flag)
@@ -308,6 +316,7 @@ void do_minp(void)
 	auto_off_millis = millis();
 }
 
+// click function of MIN-
 void do_minm(void)
 {
 	if(cal_flag)
@@ -327,11 +336,13 @@ void do_minm(void)
 	auto_off_millis = millis();
 }
 
+// doubleclick function of SET and common shutdown
 void power_off(void)
 {
 	digitalWrite(O_PWR, LOW);
 }
 
+// show the battery symbol if necessary
 void show_batt(void)
 {
 	int i, j;
@@ -367,6 +378,7 @@ void show_batt(void)
 	}
 }
 
+// initial settings
 void setup()
 {
 	WiFi.forceSleepBegin();                  // turn off ESP8266 RF
@@ -374,7 +386,7 @@ void setup()
 	system_update_cpu_freq(FREQUENCY);
 
 	pinMode(O_PWR, OUTPUT);
-	digitalWrite(O_PWR, HIGH);
+	digitalWrite(O_PWR, HIGH);				// hold the power switch
 
 	Serial.begin(115200);
 	Serial.println("\n\nAMG88xx Interpolated Thermal Camera!");
@@ -390,6 +402,7 @@ void setup()
 		eep_write_double(EEP_CALV, VBATT_CORR);
 	}
 
+	// attach the button functions
 	b_mode.attachClick(init_dragging);
 	b_mode.attachLongPressStart(next_mode);
 	b_mode.attachDoubleClick(power_off);
@@ -404,12 +417,14 @@ void setup()
 	b_minm.attachDuringLongPress(do_minm);
 	b_minm.attachDoubleClick(toggle_cal_flag);
 
+	// init the TFT
 	tft.begin();
 	tft.setRotation(2);
 	tft.fillScreen(TFT_BLACK);
 
 	auto_off_millis = millis();
 
+	// init the sensor
 	if (!amg.begin())
 	{
 		Serial.println("Could not find a valid AMG88xx sensor, check wiring!");
@@ -419,7 +434,9 @@ void setup()
 		}
 	}
 	Serial.println("-- Thermal Camera Test --");
+	Serial.end();		// no further serial output
 
+	// reconfigure the button pins (serial output is disabled now)
 	pinMode(B_MAXM, INPUT_PULLUP);
 	pinMode(B_MAXP, INPUT_PULLUP);
 	pinMode(B_MINM, INPUT_PULLUP);
@@ -429,15 +446,18 @@ void setup()
 	wdt_reset();
 }
 
+// the cyclic loop function
 void loop()
 {
 	int i, j;
 	float tval;
-	volatile unsigned long amill, vmill = 0;
+	volatile unsigned long amill;
 	char txt[64];
 
+	// read the sensor values
 	amg.readPixels(pixels);
 
+	// flip the array because of headfirst mounted sensor
 	j = AMG_COLS * AMG_ROWS - 1;
 	for(i=0; i < (AMG_COLS * AMG_ROWS / 2); i++)
 	{
@@ -447,6 +467,7 @@ void loop()
 		--j;
 	}
 
+	// do the button functions
 	b_mode.tick();
 	b_maxp.tick();
 	b_maxm.tick();
@@ -455,52 +476,54 @@ void loop()
 
 	amill = millis();
 
-	if(cal_flag)
+	if(cal_flag)								// calibration mode?
 	{
 		if((amill - blink_millis) > 500)
 		{
-			dtostrf(cal_val, 5, 3, txt);
+			dtostrf(cal_val, 5, 3, txt);		// print calibration value
 			if(blink_flag)
 			{
-				txt[cal_pos + ((cal_pos)?1:0)] = ' ';
+				txt[cal_pos + ((cal_pos)?1:0)] = ' ';	// let active position blink
 			}
 			tft.setCursor(30, tft.height() / 2 - 5);
 			tft.fillRect(30, tft.height() / 2 - 5, 60, 20, TFT_BLACK);
-			tft.print(txt);
+			tft.print(txt);						// write text to TFT
 			blink_millis = amill;
 			blink_flag ^= 1;
 		}
 	}
-	else if(volt_flag)
+	else if(volt_flag)							// voltage display mode?
 	{
 		if((amill - blink_millis) > 500)
 		{
 			tft.setCursor(30, tft.height() / 2 - 5);
-			dtostrf(read_batt(), 4, 2, txt);
+			dtostrf(read_batt(), 4, 2, txt);	// print voltage value
 			strcat(txt, " V");
 			tft.fillRect(30, tft.height() / 2 - 5, 46, 20, TFT_BLACK);
-			tft.print(txt);
+			tft.print(txt);						// write text to TFT
 			blink_millis = amill;
 			blink_flag ^= 1;
 		}
 	}
-	else
+	else										// normal display mode
 	{
-		if (modeflag & RAWMODE)
+		if (modeflag & RAWMODE)					// interpolation disabled?
 		{
 			unsigned char boxsize = min(tft.width() / AMG_COLS, tft.height() / AMG_ROWS);
-
+			// draw pixels not interpolated
 			drawpixels(pixels, AMG_ROWS, AMG_COLS, boxsize, boxsize);
 		}
-		else
+		else									// interpolation enabled?
 		{
 			unsigned char boxsize = min((uint8_t)(tft.width() / INTERPOLATED_COLS),
 					(uint8_t)(tft.height() / INTERPOLATED_COLS));
 
+			// draw interpolated pixels
 			interpolate_image(pixels, AMG_ROWS, AMG_COLS, dest_2d, INTERPOLATED_ROWS, INTERPOLATED_COLS);
 			drawpixels(dest_2d, INTERPOLATED_ROWS, INTERPOLATED_COLS, boxsize, boxsize);
 		}
 	}
+	// test for necessary auto shutdown
 	if((amill - auto_off_millis) > AUTO_OFF_TIMEOUT)
 		if(read_batt() < 4.1)
 			power_off();
@@ -517,10 +540,12 @@ void drawpixels(float *p, uint8_t rows, uint8_t cols, uint8_t boxWidth, uint8_t 
 	char txt[64];
 	unsigned char xmax = 0, ymax = 0, tpos;
 
+	// for all pixels
 	for (int y = 0; y < rows; y++)
 	{
 		for (int x = 0; x < cols; x++)
 		{
+			// find minimal and maximal values
 			float val = get_point(p, rows, cols, x, y);
 			if (val >= MAXTEMP)
 				colorTemp = MAXTEMP;
@@ -553,7 +578,6 @@ void drawpixels(float *p, uint8_t rows, uint8_t cols, uint8_t boxWidth, uint8_t 
 			}
 			else
 			{
-
 				if (!(modeflag & MANUAL))
 				{
 					if ((tmin > 0.0) && (tmin < min_drag))
@@ -562,13 +586,16 @@ void drawpixels(float *p, uint8_t rows, uint8_t cols, uint8_t boxWidth, uint8_t 
 						max_drag = tmax;
 				}
 			}
+			// map temperature to color
 			colorIndex = map(colorTemp, MINTEMP, MAXTEMP, 0, 255);
 			colorIndex = constrain(colorIndex, 0, 255);
-			//draw the pixels!
+			// draw the colored rectangle
 			tft.fillRect(boxWidth * x, boxHeight * y, boxWidth, boxHeight, camColors[colorIndex]);
 		}
+		// show battery symbol if necessary
 		show_batt();
 	}
+	// refresh text every 750ms
 	if ((millis() - lmill) > 750)
 	{
 		tpos = 105;
