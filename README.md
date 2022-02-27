@@ -44,7 +44,7 @@ Hier eine Liste der Hauptkomponenten mit Bezugsquellen
 - Akku-Lade- und Schutzschaltung [BMS](https://www.aliexpress.com/item/1S-3-7V-3A-li-ion-BMS-PCM-battery-protection-board-pcm-for-18650-lithium-ion/32673915806.html)
 - Step-Up / Step-Down Spannungsregler [3V3](https://www.aliexpress.com/item/mini-2-in-1-DC-DC-Step-Down-Step-Up-Converter-1-8V-5V-to-3/32764847210.html) 
 - 6 Stück Kurzhubtaster [9308](https://www.reichelt.com/fr/en/Switches-Tactile/TASTER-9308/3/index.html?ACTION=3&GROUPID=7587&ARTICLE=44532&START=0&OFFSET=16&)
-- Gehäuse und Tasterköpfe [ThermoCam](https://www.thingiverse.com/thing:2813276) (müssen selbst gedruckt oder in Auftrag gegeben werden)
+- Gehäuse und Tasterköpfe [ThermoCam](https://www.prusaprinters.org/prints/140136-thermocam) (müssen selbst gedruckt oder in Auftrag gegeben werden)
 
 Neben einem Stück Lochrasterplatte für die Taster, Kabeln, Widerständen und Kontaktblechstreifen sind noch einige Flachkopf-Schrauben M3x5 und M2,5x5 erforderlich. Ich habe die Löcher von Display und Sensor auf 3mm aufgebohrt und generell M3-Schrauben verwendet. 
 
